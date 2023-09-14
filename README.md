@@ -7,7 +7,7 @@
 **covreport** is a html coverage reporter for go coverprofile.
 
 ## Installation
-```go
+```shell
 go install github.com/cancue/covreport
 ```
 
