@@ -22,6 +22,10 @@ covreport -i cover.prof -o cover.html
 open cover.html
 ```
 
+## Screenshots
+![screenshots](https://github.com/cancue/covreport/assets/8125241/47b8ceaa-042d-4e4f-b306-90c8b0a09fbe)
+
+
 ## License
 
 [MIT](https://github.com/cancue/covreport/blob/master/LICENSE)
