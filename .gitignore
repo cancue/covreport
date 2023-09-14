@@ -1,0 +1,33 @@
+cover.prof
+cover.html
+
+# Editor
+.idea
+.vscode
+*.code-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.svd
+*.userprefs
+*.csproj
+*.pidb
+*.user
+*.unityproj
+*.booproj
+ExportedObj/
+*.xcuserstate
+
+# misc
+*.DS_Store
+.env
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Logs
+*.log
