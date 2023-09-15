@@ -266,14 +266,26 @@ const templateHTML = `
 			.files .wrapper.warning > * {
 				background-color: rgba(255, 255, 0, 0.2);
 			}
-			progress::-webkit-progress-value {
-				background-color: green;
-			}
-			progress::-moz-progress-value {
-				background-color: green;
-			}
-			progress::-progress-value {
-				background-color: green;
+			progress {
+				border: 1px solid black;
+			  &::-webkit-progress-value {
+					background-color: green;
+				}
+			  &::-moz-progress-value {
+					background-color: green;
+				}
+			  &::-progress-value {
+					background-color: green;
+				}
+			  &::-webkit-progress-bar {
+					background-color: white;
+				}
+			  &::-moz-progress-bar {
+					background-color: white;
+				}
+			  &::-progress-bar {
+					background-color: white;
+				}
 			}
 			.files .wrapper {
 				display: contents;
