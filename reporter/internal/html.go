@@ -15,14 +15,23 @@ import (
 func (gp *GoProject) Report(wr io.Writer) error {
 	tmpl := template.Must(template.New("html").Parse(templateHTML))
 
+	root := gp.Root()
+	for len(root.SubDirs) == 1 && len(root.Files) == 0 {
+		root = root.SubDirs[0]
+	}
+	rootName := root.Dirname
+	if rootName == "." {
+		rootName = "root"
+	}
+
 	var buf strings.Builder
-	if err := gp.Root().Write(&buf, "", IDFrom(gp.RootPackageName), "root"); err != nil {
+	if err := root.Write(&buf, "", IDFrom(root.Dirname), rootName); err != nil {
 		return err
 	}
 
 	return tmpl.Execute(wr, &TemplateData{
 		Views:  buf.String(),
-		RootID: IDFrom(gp.RootPackageName),
+		RootID: IDFrom(root.Dirname),
 	})
 }
 
@@ -186,11 +195,26 @@ const templateHTML = `
 				appearance: none;
 			}
 			.view .links {
-				font-size: 1.2em;
+				font-size: 0.8em;
 				padding: 1rem;
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
 			}
-			.view .links a {
+			.view .links a:not(:first-child) {
 				&::after {
+					content: "/";
+					color: black;
+				}
+			}
+			.view .links a:first-child {
+				border: 1px solid gray;
+				border-radius: 4px;
+				background-color: lightgray;
+				padding: 2px 4px;
+			}
+			.view .links *:nth-child(2) {
+				&::before {
 					content: "/";
 					color: black;
 				}
@@ -308,17 +332,22 @@ const templateHTML = `
 		{{.Views}}
 	</body>
 	<script>
+	const rootID = '{{.RootID}}';
+	window.location.hash = rootID;
+
 	window.renderView = () => {
 		for (const view of document.getElementsByClassName('view')) {
 			view.style.display = 'none';
 		};
-		const id = window.location.hash ? window.location.hash.substring(1) : 'root';
-		document.getElementById(id).style.display = 'block';
+		const id = window.location.hash ? window.location.hash.substring(1) : rootID;
+		const target = document.getElementById(id) || document.getElementById(rootID);
+		console.log(rootID);
+		console.log(document.getElementById(rootID));
+		target.style.display = 'block';
 	};
 	window.addEventListener('hashchange', () => {
 		window.renderView();
 	});
-	window.location.hash = '{{.RootID}}';
 	window.renderView();
 	</script>
 </html>
