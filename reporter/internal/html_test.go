@@ -1,6 +1,8 @@
 package internal_test
 
 import (
+	"bufio"
+	"strings"
 	"testing"
 
 	"github.com/cancue/covreport/reporter/internal"
@@ -13,5 +15,14 @@ func TestReport(t *testing.T) {
 		gp.Root().AddFile(&internal.GoFile{Filename: "not-exist.go"})
 		err := gp.Report(nil)
 		assert.ErrorContains(t, err, `can't read "not-exist.go"`)
+	})
+
+	t.Run("should escape HTML symbols", func(t *testing.T) {
+		var buf strings.Builder
+		dst := bufio.NewWriter(&buf)
+		err := internal.WriteHTMLEscapedCode(dst, `<>&&	"<>&&	"`)
+		assert.NoError(t, err)
+		err = dst.Flush()
+		assert.NoError(t, err)
 	})
 }

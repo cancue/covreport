@@ -75,7 +75,7 @@ func (file *GoFile) Write(w io.Writer, links, id string, basename string) error 
 		return err
 	}
 
-	for idx, code := range strings.Split(string(src), "\n") {
+	for idx, line := range strings.Split(string(src), "\n") {
 		lineNumber := idx + 1
 		var count *int
 
@@ -91,22 +91,21 @@ func (file *GoFile) Write(w io.Writer, links, id string, basename string) error 
 			}
 		}
 
-		code = strings.ReplaceAll(code, ">", "&gt;")
-		code = strings.ReplaceAll(code, "<", "&lt;")
-		code = strings.ReplaceAll(code, "&", "&amp;")
-		code = strings.ReplaceAll(code, "\t", "    ")
-
 		var err error
 		if count == nil {
-			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div><pre class=\"line\">%s</pre>\n", lineNumber, code)
+			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div><pre class=\"line\">", lineNumber)
 		} else if *count == 0 {
-			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count uncovered\"></div><pre class=\"line uncovered\">%s</pre>\n", lineNumber, code)
+			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count uncovered\"></div><pre class=\"line uncovered\">", lineNumber)
 		} else {
-			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count covered\">%dx</div><pre class=\"line covered\">%s</pre>\n", lineNumber, *count, code)
+			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count covered\">%dx</div><pre class=\"line covered\">", lineNumber, *count)
 		}
 		if err != nil {
 			return err
 		}
+		if err := WriteHTMLEscapedCode(dst, line); err != nil {
+			return err
+		}
+		fmt.Fprintf(dst, "</pre>\n")
 	}
 	if _, err := fmt.Fprint(dst, "</div></div>"); err != nil {
 		return err
@@ -165,6 +164,25 @@ func FileItemHTML(id, baseName string, numStmtCovered, numStmt int) string {
 
 func IDFrom(path string) string {
 	return uuid.NewSHA1(uuid.Nil, []byte(path)).String()
+}
+
+func WriteHTMLEscapedCode(dst *bufio.Writer, line string) error {
+	var err error
+	for i := range line {
+		switch b := line[i]; b {
+		case '>':
+			_, err = dst.WriteString("&gt;")
+		case '<':
+			_, err = dst.WriteString("&lt;")
+		case '&':
+			_, err = dst.WriteString("&amp;")
+		case '\t':
+			_, err = dst.WriteString("    ")
+		default:
+			err = dst.WriteByte(b)
+		}
+	}
+	return err
 }
 
 type TemplateData struct {
