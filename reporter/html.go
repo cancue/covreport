@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/google/uuid"
 )
 
 func (dirs GoDirs) Report(output string) error {
@@ -32,7 +34,7 @@ func (dir *GoDir) write(w io.Writer, links string, id string, basename string) e
 	filesHTML := openHeadingHTML(id, links, "files", dir.numStmtCovered, dir.numStmt)
 	for _, subDir := range dir.subDirs {
 		subDirBasename := filepath.Base(subDir.dirname)
-		subDirID := id + "-" + subDirBasename
+		subDirID := uuid.NewSHA1(uuid.Nil, []byte(subDir.dirname)).String()
 		if err := subDir.write(w, links, subDirID, subDirBasename); err != nil {
 			return err
 		}
@@ -40,11 +42,11 @@ func (dir *GoDir) write(w io.Writer, links string, id string, basename string) e
 	}
 	for _, file := range dir.files {
 		fileBasename := filepath.Base(file.filename)
-		id := id + "-" + fileBasename
-		if err := file.write(w, links, id, fileBasename); err != nil {
+		fileID := uuid.NewSHA1(uuid.Nil, []byte(file.filename)).String()
+		if err := file.write(w, links, fileID, fileBasename); err != nil {
 			return err
 		}
-		filesHTML += fileItemHTML(id, fileBasename, file.numStmtCovered, file.numStmt)
+		filesHTML += fileItemHTML(fileID, fileBasename, file.numStmtCovered, file.numStmt)
 	}
 
 	filesHTML += "</div></div>"
