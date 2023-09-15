@@ -12,7 +12,8 @@ import (
 func TestReport(t *testing.T) {
 	t.Run("should return error when cannot read file", func(t *testing.T) {
 		gp := internal.NewGoProject("/")
-		gp.Root().AddFile(&internal.GoFile{Filename: "not-exist.go"})
+		file := &internal.GoFile{GoListItem: internal.NewGoListItem("not-exist.go")}
+		gp.Root().AddFile(file)
 		err := gp.Report(nil)
 		assert.ErrorContains(t, err, `can't read "not-exist.go"`)
 	})

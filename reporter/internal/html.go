@@ -5,76 +5,85 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/template"
-
-	"github.com/google/uuid"
 )
 
 func (gp *GoProject) Report(wr io.Writer) error {
 	tmpl := template.Must(template.New("html").Parse(templateHTML))
 
-	root := gp.Root()
-	for len(root.SubDirs) == 1 && len(root.Files) == 0 {
-		root = root.SubDirs[0]
-	}
-	rootName := root.Dirname
-	if rootName == "." {
-		rootName = "root"
+	initialDir := gp.Root()
+	for len(initialDir.SubDirs) == 1 && len(initialDir.Files) == 0 {
+		initialDir = initialDir.SubDirs[0]
 	}
 
-	var buf strings.Builder
-	if err := root.Write(&buf, "", IDFrom(root.Dirname), rootName); err != nil {
+	data := &TemplateData{InitialID: initialDir.ID}
+	if err := data.AddDir(initialDir, nil); err != nil {
 		return err
 	}
 
-	return tmpl.Execute(wr, &TemplateData{
-		Views:  buf.String(),
-		RootID: IDFrom(root.Dirname),
-	})
+	return tmpl.Execute(wr, data)
 }
 
-func (dir *GoDir) Write(w io.Writer, links string, id string, basename string) error {
-	links += fmt.Sprintf(`<a href="#%s">%s</a>`, id, basename)
+func (td *TemplateData) AddDir(dir *GoDir, links []*TemplateLinkData) error {
+	var title string
+	if td.InitialID == dir.ID {
+		if dir.RelPkgPath == "." {
+			title = "root"
+		} else {
+			title = dir.RelPkgPath
+		}
+	} else {
+		title = dir.Title
+	}
 
-	filesHTML := OpenHeadingHTML(id, links, "files", dir.NumStmtCovered, dir.NumStmt)
+	view := &TemplateViewData{
+		ID:             dir.ID,
+		Links:          append(links, &TemplateLinkData{ID: dir.ID, Title: title}),
+		NumStmtCovered: dir.StmtCoveredCount,
+		NumStmt:        dir.StmtCount,
+		IsDir:          true,
+		Percent:        fmt.Sprintf("%.1f%%", dir.Percent()),
+	}
+	td.Views = append(td.Views, view)
+
+	view.Items = make([]*TemplateListItemData, 0, len(dir.SubDirs)+len(dir.Files))
 	for _, subDir := range dir.SubDirs {
-		subDirBasename := filepath.Base(subDir.Dirname)
-		subDirID := IDFrom(subDir.Dirname)
-		if err := subDir.Write(w, links, subDirID, subDirBasename); err != nil {
+		if err := td.AddDir(subDir, view.Links); err != nil {
 			return err
 		}
-		filesHTML += FileItemHTML(subDirID, subDirBasename, subDir.NumStmtCovered, subDir.NumStmt)
+		view.Items = append(view.Items, NewTemplateListItemData(subDir.GoListItem))
 	}
 	for _, file := range dir.Files {
-		fileBasename := filepath.Base(file.Filename)
-		fileID := IDFrom(file.Filename)
-		if err := file.Write(w, links, fileID, fileBasename); err != nil {
+		if err := td.AddFile(file, view.Links); err != nil {
 			return err
 		}
-		filesHTML += FileItemHTML(fileID, fileBasename, file.NumStmtCovered, file.NumStmt)
+		view.Items = append(view.Items, NewTemplateListItemData(file.GoListItem))
 	}
-
-	filesHTML += "</div></div>"
-	_, err := w.Write([]byte(filesHTML))
-	return err
+	return nil
 }
 
-func (file *GoFile) Write(w io.Writer, links, id string, basename string) error {
-	src, err := os.ReadFile(file.ABSFilename)
+func (td *TemplateData) AddFile(file *GoFile, links []*TemplateLinkData) error {
+	src, err := os.ReadFile(file.ABSPath)
 	if err != nil {
-		return fmt.Errorf("can't read %q: %v", file.Filename, err)
+		return fmt.Errorf("can't read %q: %v", file.RelPkgPath, err)
 	}
-	links += fmt.Sprintf(`<span>%s</span>`, basename)
+
+	id := file.ID
+	title := file.Title
+	view := &TemplateViewData{
+		ID:             id,
+		Links:          append(links, &TemplateLinkData{ID: id, Title: title}),
+		NumStmtCovered: file.StmtCoveredCount,
+		NumStmt:        file.StmtCount,
+		Percent:        fmt.Sprintf("%.1f%%", file.Percent()),
+	}
+	td.Views = append(td.Views, view)
 	numProfileBlock := len(file.Profile)
 	idxProfile := 0
-	dst := bufio.NewWriter(w)
 
-	if _, err := fmt.Fprint(dst, OpenHeadingHTML(id, links, "codes", file.NumStmtCovered, file.NumStmt)); err != nil {
-		return err
-	}
-
+	var buf strings.Builder
+	dst := bufio.NewWriter(&buf)
 	for idx, line := range strings.Split(string(src), "\n") {
 		lineNumber := idx + 1
 		var count *int
@@ -92,79 +101,59 @@ func (file *GoFile) Write(w io.Writer, links, id string, basename string) error 
 			}
 		}
 
-		var err error
-		if count == nil {
-			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div><pre class=\"line\">", lineNumber)
-		} else if *count == 0 {
-			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count uncovered\"></div><pre class=\"line uncovered\">", lineNumber)
-		} else {
-			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count covered\">%dx</div><pre class=\"line covered\">", lineNumber, *count)
-		}
-		if err != nil {
+		if err := WriteHTMLEscapedLine(dst, lineNumber, count, line); err != nil {
 			return err
 		}
-		if err := WriteHTMLEscapedCode(dst, line); err != nil {
-			return err
-		}
-		fmt.Fprintf(dst, "</pre>\n")
 	}
-	if _, err := fmt.Fprint(dst, "</div></div>"); err != nil {
+	if err := dst.Flush(); err != nil {
 		return err
 	}
-	return dst.Flush()
+	view.Lines = buf.String()
+	return nil
 }
 
-func OpenHeadingHTML(id, links, subclass string, numStmtCovered, numStmt int) string {
-	var percent float64
-	if numStmt == 0 {
-		percent = 0
-	} else {
-		percent = float64(numStmtCovered) / float64(numStmt) * 100
-	}
-	return fmt.Sprintf(`
-	<div id="%s" class="view file" style="display:none">
-		<div class="links">
-			%s
-		</div>
-		<div class="summary">
-			<div class="percent">%.1f%%</div>
-			<div class="label">Statements</div>
-			<div class="stmts">%d/%d</div>
-		</div>
-		<div class="%s">
-	`, id, links, percent, numStmtCovered, numStmt, subclass)
-}
+func NewTemplateListItemData(item *GoListItem) *TemplateListItemData {
+	var className string
+	percent := item.Percent()
 
-func FileItemHTML(id, baseName string, numStmtCovered, numStmt int) string {
-	var percent float64
-	var class string
-
-	if numStmt == 0 {
-		percent = 0
-	} else {
-		percent = float64(numStmtCovered) / float64(numStmt) * 100
+	if item.StmtCount > 0 {
 		if percent > 70 {
-			class = "safe"
+			className = "safe"
 		} else if percent < 40 {
-			class = "danger"
+			className = "danger"
 		} else {
-			class = "warning"
+			className = "warning"
 		}
 	}
 
-	return fmt.Sprintf(`
-		<a class="wrapper %s" href="#%s">
-			<div class="subpath">%s</div>
-			<div class="progress"><progress value="%.1f" max="100"></progress></div>
-			<div class="percent">%.1f%%</div>
-			<div class="statements">%d/%d</div>
-		</a>
-		`,
-		class, id, baseName, percent, percent, numStmtCovered, numStmt)
+	return &TemplateListItemData{
+		ClassName:      className,
+		ID:             item.ID,
+		Title:          item.Title,
+		Progress:       fmt.Sprintf("%.1f", percent),
+		Percent:        fmt.Sprintf("%.1f%%", percent),
+		NumStmtCovered: item.StmtCoveredCount,
+		NumStmt:        item.StmtCount,
+	}
 }
 
-func IDFrom(path string) string {
-	return uuid.NewSHA1(uuid.Nil, []byte(path)).String()
+func WriteHTMLEscapedLine(dst *bufio.Writer, lineNumber int, count *int, line string) error {
+	var err error
+	if count == nil {
+		_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div><pre class=\"line\">", lineNumber)
+	} else if *count == 0 {
+		_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count uncovered\"></div><pre class=\"line uncovered\">", lineNumber)
+	} else {
+		_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count covered\">%dx</div><pre class=\"line covered\">", lineNumber, *count)
+	}
+	if err != nil {
+		return err
+	}
+	if err := WriteHTMLEscapedCode(dst, line); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(dst, "</pre>\n")
+	return err
 }
 
 func WriteHTMLEscapedCode(dst *bufio.Writer, line string) error {
@@ -186,9 +175,35 @@ func WriteHTMLEscapedCode(dst *bufio.Writer, line string) error {
 	return err
 }
 
+type TemplateLinkData struct {
+	ID    string
+	Title string
+}
+
+type TemplateListItemData struct {
+	ClassName      string
+	ID             string
+	Title          string
+	Progress       string
+	Percent        string
+	NumStmtCovered int
+	NumStmt        int
+}
+
+type TemplateViewData struct {
+	ID             string
+	Percent        string
+	NumStmtCovered int
+	NumStmt        int
+	Links          []*TemplateLinkData
+	Items          []*TemplateListItemData
+	Lines          string
+	IsDir          bool
+}
+
 type TemplateData struct {
-	Views  string
-	RootID string
+	Views     []*TemplateViewData
+	InitialID string
 }
 
 const templateHTML = `
@@ -220,7 +235,7 @@ const templateHTML = `
 				align-items: center;
 				flex-wrap: wrap;
 			}
-			.view .links a:not(:first-child) {
+			.view .links a:not(:first-child):not(:last-child) {
 				&::after {
 					content: "/";
 					color: black;
@@ -260,15 +275,15 @@ const templateHTML = `
 				background-color: lightgray;
 				padding: 2px 4px;
 			}
-			.codes {
+			.lines {
 				display: grid;
 				grid-template-columns: 3em 3em auto;
 				margin-bottom: 3rem;
 			}
-			.codes .wrapper {
+			.lines .wrapper {
 				display: contents;
 			}
-			.codes .line-number, .codes .covered-count {
+			.lines .line-number, .lines .covered-count {
 				font-size: 0.5em;
 				display: flex;
 				justify-content: flex-end;
@@ -276,44 +291,44 @@ const templateHTML = `
 				margin-right: 4px;
 				padding-right: 4px;
 			}
-			.codes .line-number {
+			.lines .line-number {
 				opacity: 0.8;
 			}
-			.codes .covered-count {
+			.lines .covered-count {
 				background-color: lightgray;
 			}
-			.codes pre {
+			.lines pre {
 				margin: 0;
 				font-size: 1em;
 				line-height: 1.5em;
 				height: 1.5em;
 			}
-			.codes .uncovered {
+			.lines .uncovered {
 				background-color: rgba(255, 0, 0, 0.2);
 			}
-			.codes .covered-count.covered {
+			.lines .covered-count.covered {
 				background-color: rgba(0, 255, 0, 0.2);
 				color: green;
 			}
-			.files {
+			.items {
 				margin: 0 1rem 3rem 1rem;
 				display: grid;
 				grid-template-columns: auto max-content max-content max-content;
 				gap: 1px;
 			}
-			.files .wrapper > * {
+			.items .wrapper > * {
 				padding: 8px 1rem;
 				&:not(:first-child) {
 					color: black;
 				}
 			}
-			.files .wrapper.danger > * {
+			.items .wrapper.danger > * {
 				background-color: rgba(255, 0, 0, 0.2);
 			}
-			.files .wrapper.safe > * {
+			.items .wrapper.safe > * {
 				background-color: rgba(0, 255, 0, 0.2);
 			}
-			.files .wrapper.warning > * {
+			.items .wrapper.warning > * {
 				background-color: rgba(255, 255, 0, 0.2);
 			}
 			progress {
@@ -337,31 +352,58 @@ const templateHTML = `
 					background-color: white;
 				}
 			}
-			.files .wrapper {
+			.items .wrapper {
 				display: contents;
 				text-align: right;
 				border: 1px solid lightgray;
 			}
-			.files .wrapper .subpath {
+			.items .wrapper .subpath {
 				text-align: left;
 			}
 		</style>
 	</head>
 	<body>
-		{{.Views}}
+		{{range $idx, $view := .Views}}
+		<div id="{{$view.ID}}" class="view file" style="display:none">
+			<div class="links">
+				{{range $idx, $link := $view.Links}}
+				<a href="#{{$link.ID}}">{{$link.Title}}</a>
+				{{end}}
+			</div>
+			<div class="summary">
+				<div class="percent">{{$view.Percent}}</div>
+				<div class="label">Statements</div>
+				<div class="stmts">{{$view.NumStmtCovered}}/{{$view.NumStmt}}</div>
+			</div>
+			{{if $view.IsDir}}
+			<div class="items">
+				{{range $idx, $file := $view.Items}}
+				<a class="wrapper {{$file.ClassName}}" href="#{{$file.ID}}">
+					<div class="subpath">{{$file.Title}}</div>
+					<div class="progress"><progress value="{{$file.Progress}}" max="100"></progress></div>
+					<div class="percent">{{$file.Percent}}</div>
+					<div class="statements">{{$file.NumStmtCovered}}/{{$file.NumStmt}}</div>
+				</a>
+				{{end}}
+			</div>
+			{{else}}
+			<div class="lines">
+				{{$view.Lines}}
+			</div>
+			{{end}}
+		</div>
+		{{end}}
 	</body>
 	<script>
-	const rootID = '{{.RootID}}';
-	window.location.hash = rootID;
+	const initialID = '{{.InitialID}}';
+	window.location.hash = initialID;
 
 	window.renderView = () => {
 		for (const view of document.getElementsByClassName('view')) {
 			view.style.display = 'none';
 		};
-		const id = window.location.hash ? window.location.hash.substring(1) : rootID;
-		const target = document.getElementById(id) || document.getElementById(rootID);
-		console.log(rootID);
-		console.log(document.getElementById(rootID));
+		const id = window.location.hash ? window.location.hash.substring(1) : initialID;
+		const target = document.getElementById(id) || document.getElementById(initialID);
 		target.style.display = 'block';
 	};
 	window.addEventListener('hashchange', () => {

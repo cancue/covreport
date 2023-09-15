@@ -6,35 +6,36 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"golang.org/x/tools/cover"
 )
 
-type GoProject struct {
-	Dirs            map[string]*GoDir
-	Pkgs            map[string]*Pkg
-	RootPackageName string
-}
-
 func NewGoProject(root string) *GoProject {
 	return &GoProject{
-		Dirs:            make(map[string]*GoDir),
-		RootPackageName: root,
+		Dirs:     make(map[string]*GoDir),
+		RootPath: root,
 	}
 }
 
+type GoProject struct {
+	Dirs     map[string]*GoDir
+	RootPath string
+}
+
 func (gp *GoProject) AddAllGoFiles(pwd string) error {
-	return filepath.Walk(pwd, func(absFilename string, info os.FileInfo, err error) error {
-		if strings.HasSuffix(absFilename, ".go") && !strings.HasSuffix(absFilename, "_test.go") {
-			filename, err := filepath.Rel(pwd, absFilename)
+	return filepath.Walk(pwd, func(absPath string, info os.FileInfo, err error) error {
+		if strings.HasSuffix(absPath, ".go") && !strings.HasSuffix(absPath, "_test.go") {
+			relPkgPath, err := filepath.Rel(pwd, absPath)
 			if err != nil {
 				return err
 			}
-			if !strings.Contains(filename, gp.RootPackageName) {
-				filename = fmt.Sprintf("%s/%s", gp.RootPackageName, filename)
+			if !strings.Contains(relPkgPath, gp.RootPath) {
+				relPkgPath = fmt.Sprintf("%s/%s", gp.RootPath, relPkgPath)
 			}
-			dirname := filepath.Dir(strings.TrimPrefix(filename, pwd))
-			dir := gp.SafeDir(dirname)
-			dir.AddFile(&GoFile{ABSFilename: absFilename, Filename: filename})
+			dirRelPath := filepath.Dir(strings.TrimPrefix(relPkgPath, pwd))
+			dir := gp.SafeDir(dirRelPath)
+			file := &GoFile{ABSPath: absPath, GoListItem: NewGoListItem(relPkgPath)}
+			dir.AddFile(file)
 		}
 		return nil
 	})
@@ -45,7 +46,8 @@ func (gp *GoProject) Parse(input string) error {
 	if err != nil {
 		return err
 	}
-	if gp.Pkgs, err = findPkgs(profiles); err != nil {
+	pkgs, err := findPkgs(profiles)
+	if err != nil {
 		return err
 	}
 
@@ -53,25 +55,25 @@ func (gp *GoProject) Parse(input string) error {
 		dir := gp.SafeDir(filepath.Dir(profile.FileName))
 		var file *GoFile
 		for _, f := range dir.Files {
-			if strings.HasSuffix(profile.FileName, f.Filename) {
+			if strings.HasSuffix(profile.FileName, f.RelPkgPath) {
 				file = f
 				break
 			}
 		}
 		if file == nil {
-			absFilename, err := findFile(gp.Pkgs, profile.FileName)
+			absPath, err := findFile(pkgs, profile.FileName)
 			if err != nil {
 				return err
 			}
-			file = &GoFile{ABSFilename: absFilename, Filename: profile.FileName}
+			file = &GoFile{ABSPath: absPath, GoListItem: NewGoListItem(profile.FileName)}
 			dir.AddFile(file)
 		}
 
 		for _, block := range profile.Blocks {
 			file.Profile = append(file.Profile, block)
-			file.NumStmt += block.NumStmt
+			file.StmtCount += block.NumStmt
 			if block.Count > 0 {
-				file.NumStmtCovered += block.NumStmt
+				file.StmtCoveredCount += block.NumStmt
 			}
 		}
 	}
@@ -79,15 +81,15 @@ func (gp *GoProject) Parse(input string) error {
 	return nil
 }
 
-func (gp *GoProject) SafeDir(dirname string) *GoDir {
-	if dir, ok := gp.Dirs[dirname]; ok {
+func (gp *GoProject) SafeDir(relPkgPath string) *GoDir {
+	if dir, ok := gp.Dirs[relPkgPath]; ok {
 		return dir
 	}
 
-	dir := &GoDir{Dirname: dirname}
-	gp.Dirs[dirname] = dir
+	dir := &GoDir{GoListItem: NewGoListItem(relPkgPath)}
+	gp.Dirs[relPkgPath] = dir
 
-	parent := gp.SafeDir(filepath.Dir(dirname))
+	parent := gp.SafeDir(filepath.Dir(relPkgPath))
 	if parent != dir {
 		parent.SubDirs = append(parent.SubDirs, dir)
 	}
@@ -96,26 +98,24 @@ func (gp *GoProject) SafeDir(dirname string) *GoDir {
 }
 
 func (gp *GoProject) Root() *GoDir {
-	return gp.SafeDir(gp.RootPackageName)
+	return gp.SafeDir(gp.RootPath)
 }
 
 type GoDir struct {
-	Dirname        string
-	NumStmt        int
-	NumStmtCovered int
-	SubDirs        []*GoDir
-	Files          []*GoFile
+	*GoListItem
+	SubDirs []*GoDir
+	Files   []*GoFile
 }
 
 func (dir *GoDir) Aggregate() {
 	for _, subDir := range dir.SubDirs {
 		subDir.Aggregate()
-		dir.NumStmt += subDir.NumStmt
-		dir.NumStmtCovered += subDir.NumStmtCovered
+		dir.StmtCount += subDir.StmtCount
+		dir.StmtCoveredCount += subDir.StmtCoveredCount
 	}
 	for _, file := range dir.Files {
-		dir.NumStmt += file.NumStmt
-		dir.NumStmtCovered += file.NumStmtCovered
+		dir.StmtCount += file.StmtCount
+		dir.StmtCoveredCount += file.StmtCoveredCount
 	}
 }
 
@@ -124,9 +124,31 @@ func (dir *GoDir) AddFile(file *GoFile) {
 }
 
 type GoFile struct {
-	ABSFilename    string
-	Filename       string
-	NumStmt        int
-	NumStmtCovered int
-	Profile        []cover.ProfileBlock
+	*GoListItem
+	ABSPath string
+	Profile []cover.ProfileBlock
+}
+
+func NewGoListItem(relPkgPath string) *GoListItem {
+	return &GoListItem{
+		RelPkgPath: relPkgPath,
+		ID:         uuid.NewSHA1(uuid.Nil, []byte(relPkgPath)).String(),
+		Title:      filepath.Base(relPkgPath),
+	}
+}
+
+type GoListItem struct {
+	RelPkgPath string
+	ID         string
+	Title      string
+
+	StmtCount        int
+	StmtCoveredCount int
+}
+
+func (item *GoListItem) Percent() float64 {
+	if item.StmtCount == 0 {
+		return 0
+	}
+	return float64(item.StmtCoveredCount) / float64(item.StmtCount) * 100
 }

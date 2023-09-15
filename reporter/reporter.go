@@ -9,6 +9,7 @@ import (
 
 func Report(input, output, root string, all bool) error {
 	gp := internal.NewGoProject(root)
+
 	if all {
 		pwd, err := os.Getwd()
 		if err != nil {
@@ -18,6 +19,7 @@ func Report(input, output, root string, all bool) error {
 			return err
 		}
 	}
+
 	if err := gp.Parse(input); err != nil {
 		return err
 	}
@@ -31,5 +33,6 @@ func Report(input, output, root string, all bool) error {
 	if err := gp.Report(file); err != nil {
 		return err
 	}
+
 	return nil
 }
