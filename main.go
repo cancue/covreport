@@ -26,5 +26,7 @@ func main() {
 		panic(err)
 	}
 
-	dirs.Report(*output)
+	if err := dirs.Report(*output); err != nil {
+		panic(err)
+	}
 }

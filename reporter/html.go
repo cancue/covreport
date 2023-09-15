@@ -19,7 +19,9 @@ func (dirs GoDirs) Report(output string) error {
 	defer file.Close()
 
 	var buf strings.Builder
-	dirs.root().write(&buf, "", "root", "root")
+	if err := dirs.root().write(&buf, "", "root", "root"); err != nil {
+		return err
+	}
 
 	return tmpl.Execute(file, buf.String())
 }
@@ -31,19 +33,23 @@ func (dir *GoDir) write(w io.Writer, links string, id string, basename string) e
 	for _, subDir := range dir.subDirs {
 		subDirBasename := filepath.Base(subDir.dirname)
 		subDirID := id + "-" + subDirBasename
-		subDir.write(w, links, subDirID, subDirBasename)
+		if err := subDir.write(w, links, subDirID, subDirBasename); err != nil {
+			return err
+		}
 		filesHTML += fileItemHTML(subDirID, subDirBasename, subDir.numStmtCovered, subDir.numStmt)
 	}
 	for _, file := range dir.files {
 		fileBasename := filepath.Base(file.filename)
 		id := id + "-" + fileBasename
-		file.write(w, links, id, fileBasename)
+		if err := file.write(w, links, id, fileBasename); err != nil {
+			return err
+		}
 		filesHTML += fileItemHTML(id, fileBasename, file.numStmtCovered, file.numStmt)
 	}
 
 	filesHTML += "</div></div>"
-	w.Write([]byte(filesHTML))
-	return nil
+	_, err := w.Write([]byte(filesHTML))
+	return err
 }
 
 func (file *GoFile) write(w io.Writer, links, id string, basename string) error {
@@ -56,7 +62,9 @@ func (file *GoFile) write(w io.Writer, links, id string, basename string) error 
 	idxProfile := 0
 	dst := bufio.NewWriter(w)
 
-	fmt.Fprint(dst, openHeadingHTML(id, links, "codes", file.numStmtCovered, file.numStmt))
+	if _, err := fmt.Fprint(dst, openHeadingHTML(id, links, "codes", file.numStmtCovered, file.numStmt)); err != nil {
+		return err
+	}
 
 	for idx, code := range strings.Split(string(src), "\n") {
 		lineNumber := idx + 1
@@ -79,18 +87,22 @@ func (file *GoFile) write(w io.Writer, links, id string, basename string) error 
 		code = strings.ReplaceAll(code, "&", "&amp;")
 		code = strings.ReplaceAll(code, "\t", "    ")
 
+		var err error
 		if count == nil {
-			fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div><pre class=\"line\">%s</pre>\n", lineNumber, code)
+			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div><pre class=\"line\">%s</pre>\n", lineNumber, code)
 		} else if *count == 0 {
-			fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count uncovered\"></div><pre class=\"line uncovered\">%s</pre>\n", lineNumber, code)
+			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count uncovered\"></div><pre class=\"line uncovered\">%s</pre>\n", lineNumber, code)
 		} else {
-			fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count covered\">%dx</div><pre class=\"line covered\">%s</pre>\n", lineNumber, *count, code)
+			_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count covered\">%dx</div><pre class=\"line covered\">%s</pre>\n", lineNumber, *count, code)
+		}
+		if err != nil {
+			return err
 		}
 	}
-	fmt.Fprint(dst, "</div></div>")
-	dst.Flush()
-
-	return nil
+	if _, err := fmt.Fprint(dst, "</div></div>"); err != nil {
+		return err
+	}
+	return dst.Flush()
 }
 
 func openHeadingHTML(id, links, subclass string, numStmtCovered, numStmt int) string {
