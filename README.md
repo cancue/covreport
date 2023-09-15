@@ -18,7 +18,7 @@ go test -coverprofile cover.prof ./...
 
 ## Example
 ```shell
-covreport -i cover.prof -o cover.html
+covreport -i cover.prof -o cover.html -root {package_name (optional)}
 open cover.html
 ```
 

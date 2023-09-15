@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"os"
+	"log"
 
 	"github.com/cancue/covreport/reporter"
 )
@@ -10,23 +10,13 @@ import (
 func main() {
 	input := flag.String("i", "cover.prof", "input file name")
 	output := flag.String("o", "cover.html", "output file name")
+	root := flag.String("root", "/", "root package name")
 	all := flag.Bool("all", false, "include all go files")
 
 	flag.Parse()
 
-	dirs := make(reporter.GoDirs)
-	if *all {
-		pwd, err := os.Getwd()
-		if err != nil {
-			panic(err)
-		}
-		dirs.AddAllGoFiles(pwd)
-	}
-	if err := dirs.Parse(*input); err != nil {
-		panic(err)
-	}
-
-	if err := dirs.Report(*output); err != nil {
-		panic(err)
+	err := reporter.Report(*input, *output, *root, *all)
+	if err != nil {
+		log.Printf("error: %v", err)
 	}
 }

@@ -1,4 +1,4 @@
-package reporter
+package internal
 
 import (
 	"bufio"
@@ -12,41 +12,39 @@ import (
 	"github.com/google/uuid"
 )
 
-func (dirs GoDirs) Report(output string) error {
+func (gp *GoProject) Report(wr io.Writer) error {
 	tmpl := template.Must(template.New("html").Parse(templateHTML))
-	file, err := os.Create(output)
-	if err != nil {
-		return fmt.Errorf("can't create %q: %v", output, err)
-	}
-	defer file.Close()
 
 	var buf strings.Builder
-	if err := dirs.root().write(&buf, "", "root", "root"); err != nil {
+	if err := gp.Root().Write(&buf, "", IDFrom(gp.RootPackageName), "root"); err != nil {
 		return err
 	}
 
-	return tmpl.Execute(file, buf.String())
+	return tmpl.Execute(wr, &TemplateData{
+		Views:  buf.String(),
+		RootID: IDFrom(gp.RootPackageName),
+	})
 }
 
-func (dir *GoDir) write(w io.Writer, links string, id string, basename string) error {
+func (dir *GoDir) Write(w io.Writer, links string, id string, basename string) error {
 	links += fmt.Sprintf(`<a href="#%s">%s</a>`, id, basename)
 
-	filesHTML := openHeadingHTML(id, links, "files", dir.numStmtCovered, dir.numStmt)
-	for _, subDir := range dir.subDirs {
-		subDirBasename := filepath.Base(subDir.dirname)
-		subDirID := uuid.NewSHA1(uuid.Nil, []byte(subDir.dirname)).String()
-		if err := subDir.write(w, links, subDirID, subDirBasename); err != nil {
+	filesHTML := OpenHeadingHTML(id, links, "files", dir.NumStmtCovered, dir.NumStmt)
+	for _, subDir := range dir.SubDirs {
+		subDirBasename := filepath.Base(subDir.Dirname)
+		subDirID := IDFrom(subDir.Dirname)
+		if err := subDir.Write(w, links, subDirID, subDirBasename); err != nil {
 			return err
 		}
-		filesHTML += fileItemHTML(subDirID, subDirBasename, subDir.numStmtCovered, subDir.numStmt)
+		filesHTML += FileItemHTML(subDirID, subDirBasename, subDir.NumStmtCovered, subDir.NumStmt)
 	}
-	for _, file := range dir.files {
-		fileBasename := filepath.Base(file.filename)
-		fileID := uuid.NewSHA1(uuid.Nil, []byte(file.filename)).String()
-		if err := file.write(w, links, fileID, fileBasename); err != nil {
+	for _, file := range dir.Files {
+		fileBasename := filepath.Base(file.Filename)
+		fileID := IDFrom(file.Filename)
+		if err := file.Write(w, links, fileID, fileBasename); err != nil {
 			return err
 		}
-		filesHTML += fileItemHTML(fileID, fileBasename, file.numStmtCovered, file.numStmt)
+		filesHTML += FileItemHTML(fileID, fileBasename, file.NumStmtCovered, file.NumStmt)
 	}
 
 	filesHTML += "</div></div>"
@@ -54,17 +52,17 @@ func (dir *GoDir) write(w io.Writer, links string, id string, basename string) e
 	return err
 }
 
-func (file *GoFile) write(w io.Writer, links, id string, basename string) error {
-	src, err := os.ReadFile(file.filename)
+func (file *GoFile) Write(w io.Writer, links, id string, basename string) error {
+	src, err := os.ReadFile(file.ABSFilename)
 	if err != nil {
-		return fmt.Errorf("can't read %q: %v", file.filename, err)
+		return fmt.Errorf("can't read %q: %v", file.Filename, err)
 	}
 	links += fmt.Sprintf(`<span>%s</span>`, basename)
-	numProfileBlock := len(file.profile)
+	numProfileBlock := len(file.Profile)
 	idxProfile := 0
 	dst := bufio.NewWriter(w)
 
-	if _, err := fmt.Fprint(dst, openHeadingHTML(id, links, "codes", file.numStmtCovered, file.numStmt)); err != nil {
+	if _, err := fmt.Fprint(dst, OpenHeadingHTML(id, links, "codes", file.NumStmtCovered, file.NumStmt)); err != nil {
 		return err
 	}
 
@@ -73,14 +71,14 @@ func (file *GoFile) write(w io.Writer, links, id string, basename string) error 
 		var count *int
 
 		if idxProfile < numProfileBlock {
-			profile := file.profile[idxProfile]
+			profile := file.Profile[idxProfile]
 			if profile.EndLine < lineNumber {
 				idxProfile++
 				if idxProfile < numProfileBlock {
-					count = &file.profile[idxProfile].Count
+					count = &file.Profile[idxProfile].Count
 				}
 			} else {
-				count = &file.profile[idxProfile].Count
+				count = &file.Profile[idxProfile].Count
 			}
 		}
 
@@ -107,7 +105,7 @@ func (file *GoFile) write(w io.Writer, links, id string, basename string) error 
 	return dst.Flush()
 }
 
-func openHeadingHTML(id, links, subclass string, numStmtCovered, numStmt int) string {
+func OpenHeadingHTML(id, links, subclass string, numStmtCovered, numStmt int) string {
 	var percent float64
 	if numStmt == 0 {
 		percent = 0
@@ -128,7 +126,7 @@ func openHeadingHTML(id, links, subclass string, numStmtCovered, numStmt int) st
 	`, id, links, percent, numStmtCovered, numStmt, subclass)
 }
 
-func fileItemHTML(id, baseName string, numStmtCovered, numStmt int) string {
+func FileItemHTML(id, baseName string, numStmtCovered, numStmt int) string {
 	var percent float64
 	var class string
 
@@ -154,6 +152,15 @@ func fileItemHTML(id, baseName string, numStmtCovered, numStmt int) string {
 		</a>
 		`,
 		class, id, baseName, percent, percent, numStmtCovered, numStmt)
+}
+
+func IDFrom(path string) string {
+	return uuid.NewSHA1(uuid.Nil, []byte(path)).String()
+}
+
+type TemplateData struct {
+	Views  string
+	RootID string
 }
 
 const templateHTML = `
@@ -298,7 +305,7 @@ const templateHTML = `
 		</style>
 	</head>
 	<body>
-		{{.}}
+		{{.Views}}
 	</body>
 	<script>
 	window.renderView = () => {
@@ -311,6 +318,7 @@ const templateHTML = `
 	window.addEventListener('hashchange', () => {
 		window.renderView();
 	});
+	window.location.hash = '{{.RootID}}';
 	window.renderView();
 	</script>
 </html>
