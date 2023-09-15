@@ -10,7 +10,7 @@ import (
 func main() {
 	input := flag.String("i", "cover.prof", "input file name")
 	output := flag.String("o", "cover.html", "output file name")
-	root := flag.String("root", "/", "root package name")
+	root := flag.String("root", ".", "root package name")
 	all := flag.Bool("all", false, "include all go files")
 
 	flag.Parse()
