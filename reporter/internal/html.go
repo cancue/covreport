@@ -84,9 +84,10 @@ func (file *GoFile) Write(w io.Writer, links, id string, basename string) error 
 			if profile.EndLine < lineNumber {
 				idxProfile++
 				if idxProfile < numProfileBlock {
-					count = &file.Profile[idxProfile].Count
+					profile = file.Profile[idxProfile]
 				}
-			} else {
+			}
+			if profile.EndLine >= lineNumber && profile.StartLine <= lineNumber {
 				count = &file.Profile[idxProfile].Count
 			}
 		}
