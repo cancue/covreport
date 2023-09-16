@@ -11,15 +11,22 @@
 go install github.com/cancue/covreport@v0.3.0
 ```
 
-## Generate profile (optional)
+### (optional) Generate profile
 ```shell
 go test -coverprofile cover.prof ./...
 ```
 
 ## Example
 ```shell
-covreport -i cover.prof -o cover.html -root {package_name (optional)}
-open cover.html
+# all flags are optional
+# covreport && open cover.html
+
+covreport -i cover.prof -o cover.html -cutlines 70,40
+```
+
+## Manual
+```shell
+covreport -h
 ```
 
 ## Screenshots
