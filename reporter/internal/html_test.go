@@ -13,7 +13,7 @@ import (
 
 func TestReport(t *testing.T) {
 	t.Run("should return error when cannot read file", func(t *testing.T) {
-		gp := internal.NewGoProject("/", &config.WarningRange{GreaterThan: 70, LessThan: 40})
+		gp := internal.NewGoProject("/", &config.Cutlines{Safe: 70, Warning: 40})
 		file := &internal.GoFile{GoListItem: internal.NewGoListItem("not-exist.go")}
 		gp.Root().AddFile(file)
 		err := gp.Report(nil)
@@ -72,7 +72,7 @@ func TestNewTemplateListItemData(t *testing.T) {
 			ID:    "foo",
 			Title: "bar",
 		}
-		wr := &config.WarningRange{GreaterThan: 40, LessThan: 70}
+		wr := &config.Cutlines{Safe: 70, Warning: 40}
 		result := internal.NewTemplateListItemData(item, wr)
 		assert.Equal(t, item.ID, result.ID)
 		assert.Equal(t, item.Title, result.Title)
@@ -87,9 +87,9 @@ func TestNewTemplateListItemData(t *testing.T) {
 			Percent     string
 		}{
 			{0, 0, "", "0.0", "0.0%"},
-			{100, int(wr.LessThan), "safe", "70.0", "70.0%"},
-			{100, int(wr.GreaterThan), "warning", "40.0", "40.0%"},
-			{100, int(wr.GreaterThan) - 1, "danger", "39.0", "39.0%"},
+			{100, int(wr.Safe), "safe", "70.0", "70.0%"},
+			{100, int(wr.Warning), "warning", "40.0", "40.0%"},
+			{100, int(wr.Warning) - 1, "danger", "39.0", "39.0%"},
 		}
 
 		for _, tc := range tests {

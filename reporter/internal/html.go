@@ -19,7 +19,7 @@ func (gp *GoProject) Report(wr io.Writer) error {
 		initialDir = initialDir.SubDirs[0]
 	}
 
-	data := &TemplateData{InitialID: initialDir.ID, WarningRange: gp.WarningRange}
+	data := &TemplateData{InitialID: initialDir.ID, Cutlines: gp.Cutlines}
 	if err := data.AddDir(initialDir, nil); err != nil {
 		return err
 	}
@@ -54,13 +54,13 @@ func (td *TemplateData) AddDir(dir *GoDir, links []*TemplateLinkData) error {
 		if err := td.AddDir(subDir, view.Links); err != nil {
 			return err
 		}
-		view.Items = append(view.Items, NewTemplateListItemData(subDir.GoListItem, td.WarningRange))
+		view.Items = append(view.Items, NewTemplateListItemData(subDir.GoListItem, td.Cutlines))
 	}
 	for _, file := range dir.Files {
 		if err := td.AddFile(file, view.Links); err != nil {
 			return err
 		}
-		view.Items = append(view.Items, NewTemplateListItemData(file.GoListItem, td.WarningRange))
+		view.Items = append(view.Items, NewTemplateListItemData(file.GoListItem, td.Cutlines))
 	}
 	return nil
 }
@@ -114,14 +114,14 @@ func (td *TemplateData) AddFile(file *GoFile, links []*TemplateLinkData) error {
 	return nil
 }
 
-func NewTemplateListItemData(item *GoListItem, warning *config.WarningRange) *TemplateListItemData {
+func NewTemplateListItemData(item *GoListItem, cutlines *config.Cutlines) *TemplateListItemData {
 	var className string
 	percent := item.Percent()
 
 	if item.StmtCount > 0 {
-		if percent < warning.GreaterThan {
+		if percent < cutlines.Warning {
 			className = "danger"
-		} else if percent < warning.LessThan {
+		} else if percent < cutlines.Safe {
 			className = "warning"
 		} else {
 			className = "safe"
@@ -204,9 +204,9 @@ type TemplateViewData struct {
 }
 
 type TemplateData struct {
-	Views        []*TemplateViewData
-	InitialID    string
-	WarningRange *config.WarningRange
+	Views     []*TemplateViewData
+	InitialID string
+	Cutlines  *config.Cutlines
 }
 
 const templateHTML = `

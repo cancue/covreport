@@ -1,6 +1,6 @@
 package config
 
-type WarningRange struct {
-	GreaterThan float64
-	LessThan    float64
+type Cutlines struct {
+	Safe    float64
+	Warning float64
 }

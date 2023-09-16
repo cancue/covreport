@@ -11,18 +11,18 @@ import (
 	"golang.org/x/tools/cover"
 )
 
-func NewGoProject(root string, warning *config.WarningRange) *GoProject {
+func NewGoProject(root string, cutlines *config.Cutlines) *GoProject {
 	return &GoProject{
-		Dirs:         make(map[string]*GoDir),
-		RootPath:     root,
-		WarningRange: warning,
+		Dirs:     make(map[string]*GoDir),
+		RootPath: root,
+		Cutlines: cutlines,
 	}
 }
 
 type GoProject struct {
-	Dirs         map[string]*GoDir
-	RootPath     string
-	WarningRange *config.WarningRange
+	Dirs     map[string]*GoDir
+	RootPath string
+	Cutlines *config.Cutlines
 }
 
 func (gp *GoProject) AddAllGoFiles(pwd string) error {

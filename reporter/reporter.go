@@ -3,13 +3,15 @@ package reporter
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/cancue/covreport/reporter/config"
 	"github.com/cancue/covreport/reporter/internal"
 )
 
-func Report(input, output, root string, all bool, warning *config.WarningRange) error {
-	gp := internal.NewGoProject(root, warning)
+func Report(input, output, root string, all bool, cutlines *config.Cutlines) error {
+	gp := internal.NewGoProject(root, cutlines)
 
 	if all {
 		pwd, err := os.Getwd()
@@ -36,4 +38,21 @@ func Report(input, output, root string, all bool, warning *config.WarningRange) 
 	}
 
 	return nil
+}
+
+func ParseCutlines(cutlines string) (*config.Cutlines, error) {
+	frags := strings.Split(cutlines, ",")
+	safe, err := strconv.ParseFloat(frags[0], 64)
+	if err != nil {
+		return nil, err
+	}
+	warning, err := strconv.ParseFloat(frags[len(frags)-1], 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config.Cutlines{
+		Safe:    safe,
+		Warning: warning,
+	}, nil
 }
