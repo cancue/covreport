@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cancue/covreport/reporter/config"
 	"github.com/cancue/covreport/reporter/internal"
 )
 
-func Report(input, output, root string, all bool) error {
-	gp := internal.NewGoProject(root)
+func Report(input, output, root string, all bool, warning *config.WarningRange) error {
+	gp := internal.NewGoProject(root, warning)
 
 	if all {
 		pwd, err := os.Getwd()

@@ -6,20 +6,23 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cancue/covreport/reporter/config"
 	"github.com/google/uuid"
 	"golang.org/x/tools/cover"
 )
 
-func NewGoProject(root string) *GoProject {
+func NewGoProject(root string, warning *config.WarningRange) *GoProject {
 	return &GoProject{
-		Dirs:     make(map[string]*GoDir),
-		RootPath: root,
+		Dirs:         make(map[string]*GoDir),
+		RootPath:     root,
+		WarningRange: warning,
 	}
 }
 
 type GoProject struct {
-	Dirs     map[string]*GoDir
-	RootPath string
+	Dirs         map[string]*GoDir
+	RootPath     string
+	WarningRange *config.WarningRange
 }
 
 func (gp *GoProject) AddAllGoFiles(pwd string) error {

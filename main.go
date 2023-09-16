@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/cancue/covreport/reporter"
+	"github.com/cancue/covreport/reporter/config"
 )
 
 func main() {
@@ -15,7 +16,10 @@ func main() {
 
 	flag.Parse()
 
-	err := reporter.Report(*input, *output, *root, *all)
+	err := reporter.Report(*input, *output, *root, *all, &config.WarningRange{
+		GreaterThan: 70,
+		LessThan:    40,
+	})
 	if err != nil {
 		log.Printf("error: %v", err)
 	}

@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/cancue/covreport/reporter/config"
 )
 
 func (gp *GoProject) Report(wr io.Writer) error {
@@ -17,7 +19,7 @@ func (gp *GoProject) Report(wr io.Writer) error {
 		initialDir = initialDir.SubDirs[0]
 	}
 
-	data := &TemplateData{InitialID: initialDir.ID}
+	data := &TemplateData{InitialID: initialDir.ID, WarningRange: gp.WarningRange}
 	if err := data.AddDir(initialDir, nil); err != nil {
 		return err
 	}
@@ -52,13 +54,13 @@ func (td *TemplateData) AddDir(dir *GoDir, links []*TemplateLinkData) error {
 		if err := td.AddDir(subDir, view.Links); err != nil {
 			return err
 		}
-		view.Items = append(view.Items, NewTemplateListItemData(subDir.GoListItem))
+		view.Items = append(view.Items, NewTemplateListItemData(subDir.GoListItem, td.WarningRange))
 	}
 	for _, file := range dir.Files {
 		if err := td.AddFile(file, view.Links); err != nil {
 			return err
 		}
-		view.Items = append(view.Items, NewTemplateListItemData(file.GoListItem))
+		view.Items = append(view.Items, NewTemplateListItemData(file.GoListItem, td.WarningRange))
 	}
 	return nil
 }
@@ -112,17 +114,17 @@ func (td *TemplateData) AddFile(file *GoFile, links []*TemplateLinkData) error {
 	return nil
 }
 
-func NewTemplateListItemData(item *GoListItem) *TemplateListItemData {
+func NewTemplateListItemData(item *GoListItem, warning *config.WarningRange) *TemplateListItemData {
 	var className string
 	percent := item.Percent()
 
 	if item.StmtCount > 0 {
-		if percent > 70 {
-			className = "safe"
-		} else if percent < 40 {
+		if percent < warning.GreaterThan {
 			className = "danger"
-		} else {
+		} else if percent < warning.LessThan {
 			className = "warning"
+		} else {
+			className = "safe"
 		}
 	}
 
@@ -202,8 +204,9 @@ type TemplateViewData struct {
 }
 
 type TemplateData struct {
-	Views     []*TemplateViewData
-	InitialID string
+	Views        []*TemplateViewData
+	InitialID    string
+	WarningRange *config.WarningRange
 }
 
 const templateHTML = `
