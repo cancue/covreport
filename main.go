@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"log"
 	"os"
 
@@ -9,21 +8,14 @@ import (
 )
 
 func main() {
-	input := flag.String("i", "cover.prof", "input file name")
-	output := flag.String("o", "cover.html", "output file name")
-	root := flag.String("root", ".", "root package name")
-	cutlines := flag.String("cutlines", "70,40", "cutlines (safe,warning)")
-	all := flag.Bool("all", false, "include all go files")
-
-	flag.Parse()
-
-	parsedCutlines, err := reporter.ParseCutlines(*cutlines)
+	cfg, err := reporter.NewCLIConfig()
 	if err != nil {
-		goto ERROR
+		goto LogError
 	}
-	err = reporter.Report(*input, *output, *root, *all, parsedCutlines)
 
-ERROR:
+	err = reporter.Report(cfg)
+
+LogError:
 	if err != nil {
 		log.Printf("error: %v", err)
 		os.Exit(1)
