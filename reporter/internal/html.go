@@ -399,7 +399,6 @@ const templateHTML = `
 	</body>
 	<script>
 	const initialID = '{{.InitialID}}';
-	window.location.hash = initialID;
 
 	window.renderView = () => {
 		for (const view of document.getElementsByClassName('view')) {
