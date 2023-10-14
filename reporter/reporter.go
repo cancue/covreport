@@ -14,16 +14,6 @@ import (
 func Report(cfg *config.Config) error {
 	gp := internal.NewGoProject(cfg.Root, cfg.Cutlines)
 
-	if cfg.All {
-		pwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		if err := gp.AddAllGoFiles(pwd); err != nil {
-			return err
-		}
-	}
-
 	if err := gp.Parse(cfg.Input); err != nil {
 		return err
 	}
@@ -45,7 +35,6 @@ func NewCLIConfig() (*config.Config, error) {
 	input := flag.String("i", "cover.prof", "input file name")
 	output := flag.String("o", "cover.html", "output file name")
 	cutlines := flag.String("cutlines", "70,40", "cutlines (safe,warning)")
-	all := flag.Bool("all", false, "include all go files")
 	root := flag.String("root", ".", "root package name")
 	flag.Parse()
 
@@ -58,7 +47,6 @@ func NewCLIConfig() (*config.Config, error) {
 		Input:    *input,
 		Output:   *output,
 		Cutlines: parsedCutlines,
-		All:      *all,
 		Root:     *root,
 	}, nil
 }
