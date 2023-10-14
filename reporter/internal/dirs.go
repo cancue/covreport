@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -23,25 +21,6 @@ type GoProject struct {
 	Dirs     map[string]*GoDir
 	RootPath string
 	Cutlines *config.Cutlines
-}
-
-func (gp *GoProject) AddAllGoFiles(pwd string) error {
-	return filepath.Walk(pwd, func(absPath string, info os.FileInfo, err error) error {
-		if strings.HasSuffix(absPath, ".go") && !strings.HasSuffix(absPath, "_test.go") {
-			relPkgPath, err := filepath.Rel(pwd, absPath)
-			if err != nil {
-				return err
-			}
-			if !strings.Contains(relPkgPath, gp.RootPath) {
-				relPkgPath = fmt.Sprintf("%s/%s", gp.RootPath, relPkgPath)
-			}
-			dirRelPath := filepath.Dir(strings.TrimPrefix(relPkgPath, pwd))
-			dir := gp.SafeDir(dirRelPath)
-			file := &GoFile{ABSPath: absPath, GoListItem: NewGoListItem(relPkgPath)}
-			dir.AddFile(file)
-		}
-		return nil
-	})
 }
 
 func (gp *GoProject) Parse(input string) error {

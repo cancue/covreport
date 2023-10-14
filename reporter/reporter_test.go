@@ -59,7 +59,6 @@ func TestNewCLIConfig(t *testing.T) {
 		assert.Equal(t, "cover.html", cfg.Output)
 		assert.Equal(t, 70.0, cfg.Cutlines.Safe)
 		assert.Equal(t, 40.0, cfg.Cutlines.Warning)
-		assert.Equal(t, false, cfg.All)
 		assert.Equal(t, ".", cfg.Root)
 	})
 }

@@ -4,7 +4,6 @@ type Config struct {
 	Input    string
 	Output   string
 	Root     string
-	All      bool
 	Cutlines *Cutlines
 }
 type Cutlines struct {
