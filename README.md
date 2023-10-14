@@ -3,6 +3,7 @@
 [![godoc - documentation](https://godoc.org/github.com/cancue/covreport?status.svg)](https://pkg.go.dev/github.com/cancue/covreport)
 [![go report card](https://goreportcard.com/badge/github.com/cancue/covreport)](https://goreportcard.com/report/github.com/cancue/covreport)
 [![github action - test](https://github.com/cancue/covreport/workflows/test/badge.svg)](https://github.com/cancue/covreport/actions)
+[![codecov - code coverage](https://img.shields.io/codecov/c/github/cancue/covreport.svg?style=flat-square)](https://codecov.io/gh/cancue/covreport)
 
 **covreport** is a html coverage reporter for go coverprofile.
 
