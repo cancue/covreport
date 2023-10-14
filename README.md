@@ -9,7 +9,7 @@
 
 ## Installation
 ```shell
-go install github.com/cancue/covreport@v0.3.0
+go install github.com/cancue/covreport@latest
 ```
 
 ### (optional) Generate profile
