@@ -15,8 +15,10 @@ func (gp *GoProject) Report(wr io.Writer) error {
 	tmpl := template.Must(template.New("html").Parse(templateHTML))
 
 	initialDir := gp.Root()
-	for len(initialDir.SubDirs) == 1 && len(initialDir.Files) == 0 {
-		initialDir = initialDir.SubDirs[0]
+	if gp.RootPath == "." {
+		for len(initialDir.SubDirs) == 1 && len(initialDir.Files) == 0 {
+			initialDir = initialDir.SubDirs[0]
+		}
 	}
 
 	data := &TemplateData{InitialID: initialDir.ID, Cutlines: gp.Cutlines}
