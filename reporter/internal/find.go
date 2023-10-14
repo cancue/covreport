@@ -1,3 +1,5 @@
+// This code is adapted from the Go standard library's cover tool:
+// https://github.com/golang/go/blob/master/src/cmd/cover/func.go
 package internal
 
 import (
@@ -30,7 +32,7 @@ func findPkgs(profiles []*cover.Profile) (map[string]*Pkg, error) {
 	var list []string
 	for _, profile := range profiles {
 		if strings.HasPrefix(profile.FileName, ".") || filepath.IsAbs(profile.FileName) {
-			// Relative or absolute path.
+			// Ignore relative or absolute path.
 			continue
 		}
 		pkg := path.Dir(profile.FileName)
@@ -72,7 +74,7 @@ func findPkgs(profiles []*cover.Profile) (map[string]*Pkg, error) {
 // findFile finds the location of the named file in GOROOT, GOPATH etc.
 func findFile(pkgs map[string]*Pkg, file string) (string, error) {
 	if strings.HasPrefix(file, ".") || filepath.IsAbs(file) {
-		// Relative or absolute path.
+		// Ignore relative or absolute path.
 		return file, nil
 	}
 	pkg := pkgs[path.Dir(file)]
