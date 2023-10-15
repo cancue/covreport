@@ -31,7 +31,7 @@ covreport -h
 ```
 
 ## Screenshots
-![screenshots](https://github.com/cancue/covreport/assets/8125241/f49a74ed-6f1e-43ed-b4d2-ae073dae302a)
+![screenshots](https://github.com/cancue/covreport/assets/8125241/c9f89c27-64b8-4ef6-91af-623910243a8f)
 
 ## License
 
