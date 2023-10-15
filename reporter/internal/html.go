@@ -343,23 +343,26 @@ const templateHTML = `
 			}
 			.items .wrapper.danger > * {
 				background-color: rgba(255, 0, 0, 0.2);
+				--accent-color: red;
 			}
 			.items .wrapper.safe > * {
 				background-color: rgba(0, 255, 0, 0.2);
+				--accent-color: green;
 			}
 			.items .wrapper.warning > * {
 				background-color: rgba(255, 255, 0, 0.2);
+				--accent-color: orange;
 			}
 			progress {
 				border: 1px solid black;
 			  &::-webkit-progress-value {
-					background-color: green;
+					background-color: var(--accent-color);
 				}
 			  &::-moz-progress-value {
-					background-color: green;
+					background-color: var(--accent-color);
 				}
 			  &::-progress-value {
-					background-color: green;
+					background-color: var(--accent-color);
 				}
 			  &::-webkit-progress-bar {
 					background-color: white;
