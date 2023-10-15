@@ -1,3 +1,4 @@
+// Package reporter provides functions for generating coverage reports.
 package reporter
 
 import (
@@ -11,9 +12,9 @@ import (
 	"github.com/cancue/covreport/reporter/internal"
 )
 
+// Report generates a coverage report using the given configuration.
 func Report(cfg *config.Config) error {
 	gp := internal.NewGoProject(cfg.Root, cfg.Cutlines)
-
 	if err := gp.Parse(cfg.Input); err != nil {
 		return err
 	}
@@ -31,6 +32,7 @@ func Report(cfg *config.Config) error {
 	return nil
 }
 
+// NewCLIConfig creates a new configuration based on the command-line arguments.
 func NewCLIConfig() (*config.Config, error) {
 	input := flag.String("i", "cover.prof", "input file name")
 	output := flag.String("o", "cover.html", "output file name")
@@ -51,6 +53,7 @@ func NewCLIConfig() (*config.Config, error) {
 	}, nil
 }
 
+// ParseCutlines parses the cutlines argument.
 func ParseCutlines(cutlines string) (*config.Cutlines, error) {
 	frags := strings.Split(cutlines, ",")
 	safe, err := strconv.ParseFloat(frags[0], 64)

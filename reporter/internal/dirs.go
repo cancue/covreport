@@ -23,11 +23,13 @@ type GoProject struct {
 	Cutlines *config.Cutlines
 }
 
+// Parse parses the input profiles filename and updates the GoProject's coverage report.
 func (gp *GoProject) Parse(input string) error {
 	profiles, err := cover.ParseProfiles(input)
 	if err != nil {
 		return err
 	}
+
 	pkgs, err := findPkgs(profiles)
 	if err != nil {
 		return err
@@ -63,6 +65,7 @@ func (gp *GoProject) Parse(input string) error {
 	return nil
 }
 
+// SafeDir returns a pointer to a GoDir object for the given relative package path.
 func (gp *GoProject) SafeDir(relPkgPath string) *GoDir {
 	if dir, ok := gp.Dirs[relPkgPath]; ok {
 		return dir
@@ -79,6 +82,7 @@ func (gp *GoProject) SafeDir(relPkgPath string) *GoDir {
 	return dir
 }
 
+// Root returns the root directory of the Go project.
 func (gp *GoProject) Root() *GoDir {
 	return gp.SafeDir(gp.RootPath)
 }
@@ -89,6 +93,8 @@ type GoDir struct {
 	Files   []*GoFile
 }
 
+// Aggregate recursively aggregates the total and covered statement count
+// of the GoDir and its subdirectories and files.
 func (dir *GoDir) Aggregate() {
 	for _, subDir := range dir.SubDirs {
 		subDir.Aggregate()
@@ -101,6 +107,7 @@ func (dir *GoDir) Aggregate() {
 	}
 }
 
+// AddFile adds a GoFile to the GoDir's list of files.
 func (dir *GoDir) AddFile(file *GoFile) {
 	dir.Files = append(dir.Files, file)
 }
@@ -128,6 +135,7 @@ type GoListItem struct {
 	StmtCoveredCount int
 }
 
+// Percent calculates the percentage of statement coverage for a GoListItem.
 func (item *GoListItem) Percent() float64 {
 	if item.StmtCount == 0 {
 		return 0

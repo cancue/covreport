@@ -11,6 +11,8 @@ import (
 	"github.com/cancue/covreport/reporter/config"
 )
 
+// Report generates an HTML report of the GoProject and writes it to the provided io.Writer.
+// The report includes a directory tree of the project's files and directories, along with coverage information.
 func (gp *GoProject) Report(wr io.Writer) error {
 	tmpl := template.Must(template.New("html").Parse(templateHTML))
 
@@ -29,6 +31,7 @@ func (gp *GoProject) Report(wr io.Writer) error {
 	return tmpl.Execute(wr, data)
 }
 
+// AddDir adds a directory to the template data.
 func (td *TemplateData) AddDir(dir *GoDir, links []*TemplateLinkData) error {
 	var title string
 	if td.InitialID == dir.ID {
@@ -67,6 +70,8 @@ func (td *TemplateData) AddDir(dir *GoDir, links []*TemplateLinkData) error {
 	return nil
 }
 
+// AddFile adds a Go file to the template data with the given links and returns an error if any.
+// The method also generates the HTML-escaped lines of code for the file and adds them to the view data.
 func (td *TemplateData) AddFile(file *GoFile, links []*TemplateLinkData) error {
 	src, err := os.ReadFile(file.ABSPath)
 	if err != nil {
@@ -116,6 +121,7 @@ func (td *TemplateData) AddFile(file *GoFile, links []*TemplateLinkData) error {
 	return nil
 }
 
+// NewTemplateListItemData returns a new instance of TemplateListItemData based on the given GoListItem and Cutlines.
 func NewTemplateListItemData(item *GoListItem, cutlines *config.Cutlines) *TemplateListItemData {
 	var className string
 	percent := item.Percent()
@@ -141,6 +147,7 @@ func NewTemplateListItemData(item *GoListItem, cutlines *config.Cutlines) *Templ
 	}
 }
 
+// WriteHTMLEscapedLine writes an HTML-escaped line to the given bufio.Writer.
 func WriteHTMLEscapedLine(dst *bufio.Writer, lineNumber int, count *int, line string) error {
 	var err error
 	if count == nil {
@@ -160,6 +167,7 @@ func WriteHTMLEscapedLine(dst *bufio.Writer, lineNumber int, count *int, line st
 	return err
 }
 
+// WriteHTMLEscapedCode writes the given line to the provided bufio.Writer, escaping HTML special characters.
 func WriteHTMLEscapedCode(dst *bufio.Writer, line string) error {
 	var err error
 	for i := range line {
@@ -179,11 +187,13 @@ func WriteHTMLEscapedCode(dst *bufio.Writer, line string) error {
 	return err
 }
 
+// TemplateLinkData represents the data needed for a link in a template.
 type TemplateLinkData struct {
 	ID    string
 	Title string
 }
 
+// TemplateListItemData represents the data structure for a single item in the HTML template list.
 type TemplateListItemData struct {
 	ClassName      string
 	ID             string
@@ -194,6 +204,7 @@ type TemplateListItemData struct {
 	NumStmt        int
 }
 
+// TemplateViewData represents the data needed to render a template view.
 type TemplateViewData struct {
 	ID             string
 	Percent        string
@@ -205,12 +216,15 @@ type TemplateViewData struct {
 	IsDir          bool
 }
 
+// TemplateData is a struct that holds data for generating HTML templates.
 type TemplateData struct {
 	Views     []*TemplateViewData
 	InitialID string
 	Cutlines  *config.Cutlines
 }
 
+// templateHTML is the HTML template used to generate the coverage report.
+// It contains CSS styles, JS scripts and HTML structure for displaying coverage information.
 const templateHTML = `
 <!DOCTYPE html>
 <html>

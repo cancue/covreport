@@ -26,6 +26,7 @@ type Pkg struct {
 	}
 }
 
+// findPkgs finds the location of every package we care about by running go list.
 func findPkgs(profiles []*cover.Profile) (map[string]*Pkg, error) {
 	// Run go list to find the location of every package we care about.
 	pkgs := make(map[string]*Pkg)
