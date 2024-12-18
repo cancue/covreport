@@ -8,6 +8,9 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/alecthomas/chroma/v2/formatters/html"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/cancue/covreport/reporter/config"
 )
 
@@ -91,6 +94,10 @@ func (td *TemplateData) AddFile(file *GoFile, links []*TemplateLinkData) error {
 	numProfileBlock := len(file.Profile)
 	idxProfile := 0
 
+	lexer := lexers.Get("go")
+	style := styles.Get("monokai")
+	formatter := html.New(html.WithLineNumbers(false))
+
 	var buf strings.Builder
 	dst := bufio.NewWriter(&buf)
 	for idx, line := range strings.Split(string(src), "\n") {
@@ -110,7 +117,17 @@ func (td *TemplateData) AddFile(file *GoFile, links []*TemplateLinkData) error {
 			}
 		}
 
-		if err := WriteHTMLEscapedLine(dst, lineNumber, count, line); err != nil {
+		err := WriteCodePrefixHTML(dst, lineNumber, count)
+		if err != nil {
+			return err
+		}
+
+		iterator, err := lexer.Tokenise(nil, line)
+		if err != nil {
+			return err
+		}
+
+		if err = formatter.Format(dst, style, iterator); err != nil {
 			return err
 		}
 	}
@@ -147,23 +164,16 @@ func NewTemplateListItemData(item *GoListItem, cutlines *config.Cutlines) *Templ
 	}
 }
 
-// WriteHTMLEscapedLine writes an HTML-escaped line to the given bufio.Writer.
-func WriteHTMLEscapedLine(dst *bufio.Writer, lineNumber int, count *int, line string) error {
+// WriteCodePrefixHTML writes the prefix of a code line to the provided bufio.Writer.
+func WriteCodePrefixHTML(dst *bufio.Writer, lineNumber int, count *int) error {
 	var err error
 	if count == nil {
-		_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div><pre class=\"line\">", lineNumber)
+		_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count\"></div>", lineNumber)
 	} else if *count == 0 {
-		_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count uncovered\"></div><pre class=\"line uncovered\">", lineNumber)
+		_, err = fmt.Fprintf(dst, "<div class=\"line-number uncovered\">%d</div><div class=\"covered-count uncovered\"></div>", lineNumber)
 	} else {
-		_, err = fmt.Fprintf(dst, "<div class=\"line-number\">%d</div><div class=\"covered-count covered\">%dx</div><pre class=\"line covered\">", lineNumber, *count)
+		_, err = fmt.Fprintf(dst, "<div class=\"line-number covered\">%d</div><div class=\"covered-count covered\">%dx</div>", lineNumber, *count)
 	}
-	if err != nil {
-		return err
-	}
-	if err := WriteHTMLEscapedCode(dst, line); err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(dst, "</pre>\n")
 	return err
 }
 
@@ -232,8 +242,10 @@ const templateHTML = `
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 		<title>Go Coverage Report</title>
 		<style>
-			body {
+			html, body, .view {
+				height: 100%;
 				font-family: Menlo, monospace;
+				margin: 0;
 			}
 			a {
 				text-decoration: none;
@@ -246,6 +258,9 @@ const templateHTML = `
 				-webkit-appearance: none;
 				-moz-appearance: none;        
 				appearance: none;
+			}
+			.view {
+				flex-direction: column;
 			}
 			.view .links {
 				font-size: 0.8em;
@@ -294,10 +309,25 @@ const templateHTML = `
 				background-color: lightgray;
 				padding: 2px 4px;
 			}
+			.codes {
+				position: relative;
+				flex: 1;
+			}
+			.lines-container {
+				position: absolute;
+				top: 1rem;
+				left: 1rem;
+				right: 1rem;
+				bottom: 1rem;
+				overflow: auto;
+			}
 			.lines {
 				display: grid;
 				grid-template-columns: 3em 3em auto;
-				margin-bottom: 3rem;
+
+				font-size: 1em;
+				line-height: 1.5em;
+				background-color: rgba(0, 0, 0, 1);
 			}
 			.lines .wrapper {
 				display: contents;
@@ -307,27 +337,30 @@ const templateHTML = `
 				display: flex;
 				justify-content: flex-end;
 				align-items: center;
-				margin-right: 4px;
 				padding-right: 4px;
 			}
-			.lines .line-number {
-				opacity: 0.8;
-			}
+			.lines .line-number,
 			.lines .covered-count {
-				background-color: lightgray;
+				-moz-user-select: none;
+				-webkit-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			.lines .line-number {
+				color: rgba(255, 255, 255, 0.8);
 			}
 			.lines pre {
 				margin: 0;
-				font-size: 1em;
-				line-height: 1.5em;
-				height: 1.5em;
+				padding: 0 4px;
+				tab-size: 2em;
 			}
-			.lines .uncovered {
-				background-color: rgba(255, 0, 0, 0.2);
+			.lines .uncovered,
+			.lines .uncovered + pre {
+				background-color: rgba(255, 0, 0, 0.5) !important;
 			}
-			.lines .covered-count.covered {
-				background-color: rgba(0, 255, 0, 0.2);
-				color: green;
+			.lines .covered {
+				background-color: rgba(0, 255, 0, 0.5);
+				color: white;
 			}
 			.items {
 				margin: 0 1rem 3rem 1rem;
@@ -409,8 +442,12 @@ const templateHTML = `
 				{{end}}
 			</div>
 			{{else}}
-			<div class="lines">
-				{{$view.Lines}}
+			<div class="codes">
+				<div class="lines-container">
+					<div class="lines">
+						{{$view.Lines}}
+					</div>
+				</div>
 			</div>
 			{{end}}
 		</div>
@@ -425,7 +462,7 @@ const templateHTML = `
 		};
 		const id = window.location.hash ? window.location.hash.substring(1) : initialID;
 		const target = document.getElementById(id) || document.getElementById(initialID);
-		target.style.display = 'block';
+		target.style.display = 'flex';
 	};
 	window.addEventListener('hashchange', () => {
 		window.renderView();

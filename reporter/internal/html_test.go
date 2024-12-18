@@ -36,7 +36,6 @@ func TestWriteHTMLEscapedCode(t *testing.T) {
 
 func TestWriteHTMLEscapedLine(t *testing.T) {
 	ln := 3
-	code := "foo := 5"
 	uncoveredCount := 0
 	coveredCount := 1
 
@@ -57,9 +56,9 @@ func TestWriteHTMLEscapedLine(t *testing.T) {
 			if tc.count != nil && *tc.count > 0 {
 				count = fmt.Sprintf("%dx", *tc.count)
 			}
-			expected := fmt.Sprintf(`<div class="line-number">%d</div><div class="covered-count%s">%s</div><pre class="line%s">%s</pre>%s`, ln, tc.class, count, tc.class, code, "\n")
+			expected := fmt.Sprintf(`<div class="line-number%s">%d</div><div class="covered-count%s">%s</div>`, tc.class, ln, tc.class, count)
 
-			err := WriteHTMLEscapedLine(dst, ln, tc.count, code)
+			err := WriteCodePrefixHTML(dst, ln, tc.count)
 			assert.NoError(t, err)
 			dst.Flush()
 			assert.Equal(t, expected, buf.String())
