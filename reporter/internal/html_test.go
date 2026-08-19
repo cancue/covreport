@@ -3,6 +3,7 @@ package internal
 import (
 	"bufio"
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -57,7 +58,7 @@ func TestWriteHTMLEscapedLine(t *testing.T) {
 			if tc.count != nil && *tc.count > 0 {
 				count = fmt.Sprintf("%dx", *tc.count)
 			}
-			expected := fmt.Sprintf(`<div class="line-number">%d</div><div class="covered-count%s">%s</div><pre class="line%s">%s</pre>%s`, ln, tc.class, count, tc.class, code, "\n")
+			expected := fmt.Sprintf(`<div class="src-line%s"><div class="line-number">%d</div><div class="covered-count">%s</div><pre>%s</pre></div>%s`, tc.class, ln, count, code, "\n")
 
 			err := WriteHTMLEscapedLine(dst, ln, tc.count, code)
 			assert.NoError(t, err)
@@ -145,4 +146,78 @@ func TestAddFile(t *testing.T) {
 	assert.Equal(t, file.StmtCoveredCount, td.Views[0].NumStmtCovered)
 	assert.Equal(t, file.StmtCount, td.Views[0].NumStmt)
 	assert.Equal(t, fmt.Sprintf("%.1f%%", file.Percent()), td.Views[0].Percent)
+	assert.Contains(t, td.Views[0].Lines, `<span class="`)
+	assert.Contains(t, td.Views[0].Lines, `class="src-line`)
+}
+
+func TestAddDirMarksDirectoryItems(t *testing.T) {
+	_, curFilename, _, ok := runtime.Caller(0)
+	assert.True(t, ok)
+
+	root := &GoDir{GoListItem: NewGoListItem("rootpkg")}
+	sub := &GoDir{GoListItem: NewGoListItem("rootpkg/sub")}
+	root.SubDirs = []*GoDir{sub}
+	root.Files = []*GoFile{{
+		GoListItem: NewGoListItem("rootpkg/file.go"),
+		ABSPath:    curFilename,
+	}}
+
+	td := &TemplateData{InitialID: root.ID, Cutlines: &config.Cutlines{Safe: 70, Warning: 40}}
+	err := td.AddDir(root, nil)
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, len(td.Views), 1)
+	assert.Len(t, td.Views[0].Items, 2)
+	assert.True(t, td.Views[0].Items[0].IsDir)
+	assert.False(t, td.Views[0].Items[1].IsDir)
+	assert.Contains(t, td.Views[0].Items[0].Title, "sub")
+}
+
+func TestBreadcrumbsStayWithTheirView(t *testing.T) {
+	_, htmlTest, _, ok := runtime.Caller(0)
+	assert.True(t, ok)
+	other := filepath.Join(filepath.Dir(htmlTest), "highlight.go")
+
+	root := &GoDir{GoListItem: NewGoListItem("pkg")}
+	first := &GoFile{GoListItem: NewGoListItem("pkg/html_test.go"), ABSPath: htmlTest}
+	second := &GoFile{GoListItem: NewGoListItem("pkg/highlight.go"), ABSPath: other}
+	root.Files = []*GoFile{first, second}
+
+	td := &TemplateData{InitialID: root.ID, Cutlines: &config.Cutlines{Safe: 70, Warning: 40}}
+	err := td.AddDir(root, nil)
+	assert.NoError(t, err)
+	assert.Len(t, td.Views, 3)
+
+	assert.Equal(t, root.ID, td.Views[0].Links[len(td.Views[0].Links)-1].ID)
+	assert.Equal(t, first.ID, td.Views[1].ID)
+	assert.Equal(t, first.ID, td.Views[1].Links[len(td.Views[1].Links)-1].ID)
+	assert.Equal(t, first.Title, td.Views[1].Links[len(td.Views[1].Links)-1].Title)
+	assert.Equal(t, second.ID, td.Views[2].ID)
+	assert.Equal(t, second.ID, td.Views[2].Links[len(td.Views[2].Links)-1].ID)
+	assert.Equal(t, second.Title, td.Views[2].Links[len(td.Views[2].Links)-1].Title)
+}
+
+func TestReportRendersHighlightedHTML(t *testing.T) {
+	_, curFilename, _, ok := runtime.Caller(0)
+	assert.True(t, ok)
+
+	gp := NewGoProject("/", &config.Cutlines{Safe: 70, Warning: 40}, nil)
+	file := &GoFile{
+		GoListItem: NewGoListItem(curFilename),
+		ABSPath:    curFilename,
+		Profile:    []cover.ProfileBlock{{StartLine: 1, EndLine: 2, Count: 1, NumStmt: 1}},
+	}
+	file.StmtCount = 1
+	file.StmtCoveredCount = 1
+	gp.Root().AddFile(file)
+
+	var buf strings.Builder
+	err := gp.Report(&buf)
+	assert.NoError(t, err)
+	out := buf.String()
+	assert.Contains(t, out, ".chroma")
+	assert.Contains(t, out, `class="view file`)
+	assert.Contains(t, out, `class="lines chroma"`)
+	assert.Contains(t, out, `<span class="`)
+	assert.Contains(t, out, `class="legend"`)
+	assert.Contains(t, out, `class="src-line covered"`)
 }
