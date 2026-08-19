@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/cancue/covreport/compare/v0.5.0...v0.6.0) (2026-08-19)
+
+
+### Features
+
+* **html:** highlight source and refresh report UI ([97f9237](https://github.com/cancue/covreport/commit/97f92376dc3343bc0e33dcba912297da6f368900))
+
 ## [0.5.0](https://github.com/cancue/covreport/compare/v0.4.0...v0.5.0) (2024-08-06)
 
 
